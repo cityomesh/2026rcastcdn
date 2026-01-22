@@ -1,0 +1,275 @@
+"use client";
+
+import { useEffect, useState, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import {
+  Container,
+  Title,
+  Paper,
+  Group,
+  Button,
+  Text,
+  List,
+  Loader,
+  Stack,
+  Box,
+  Divider,
+  Badge,
+} from "@mantine/core";
+import { IconArrowLeft, IconPencil, IconTrash } from "@tabler/icons-react";
+import { notifications } from "@mantine/notifications";
+// import { RouteServerAssignment } from "@/app/types/server";
+import { api } from "@/app/utils/api";
+import { RouteServerAssignment } from "@/app/types/server";
+
+// Create a component to use search params
+function RouteServerDetail() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const id = searchParams.get("id");
+  const [loading, setLoading] = useState(true);
+  const [deleting, setDeleting] = useState(false);
+  const [assignment, setAssignment] = useState<RouteServerAssignment | null>(
+    null
+  );
+
+  useEffect(() => {
+    const fetchData = async () => {
+      if (!id) {
+        router.push("/");
+        return;
+      }
+
+      try {
+        setLoading(true);
+        // Fetch the assignments and find the one with matching ID
+        const result = await api.get("api/route-servers");
+
+        if (result.success) {
+          const assignment = result.data.find(
+            (a: RouteServerAssignment) => a.id === id
+          );
+          if (assignment) {
+            setAssignment(assignment);
+          } else {
+            notifications.show({
+              title: "Error",
+              message: "Assignment not found",
+              color: "red",
+            });
+            router.push("/");
+          }
+        } else {
+          notifications.show({
+            title: "Error",
+            message: "Failed to fetch assignment details",
+            color: "red",
+          });
+        }
+      } catch (error) {
+        console.error("Error fetching assignment details:", error);
+        notifications.show({
+          title: "Error",
+          message: "An error occurred while fetching assignment details",
+          color: "red",
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [id, router]);
+
+  const handleEdit = () => {
+    if (id) {
+      router.push(`/route-servers/edit?id=${id}`);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!id || !assignment) return;
+
+    try {
+      setDeleting(true);
+
+      let result;
+      if (assignment.source === "rules_conf") {
+        // For rules.conf entries, pass the path as a query parameter
+        result = await api.delete(
+          `api/route-servers/${id}?path=${encodeURIComponent(assignment.from)}`
+        );
+      } else {
+        // For local assignments
+        result = await api.delete(`api/route-servers/${id}`);
+      }
+
+      if (result.success) {
+        notifications.show({
+          title: "Success",
+          message:
+            assignment.source === "rules_conf"
+              ? "Configuration rule deleted successfully"
+              : "Assignment deleted successfully",
+          color: "green",
+        });
+        router.push("/");
+      } else {
+        notifications.show({
+          title: "Error",
+          message: "Failed to delete assignment",
+          color: "red",
+        });
+      }
+    } catch (error) {
+      console.error("Error deleting assignment:", error);
+      notifications.show({
+        title: "Error",
+        message: "An error occurred while deleting",
+        color: "red",
+      });
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <Container size="md" py="xl">
+        <Stack align="center" justify="center" h="60vh">
+          <Loader size="lg" />
+          <Text>Loading assignment details...</Text>
+        </Stack>
+      </Container>
+    );
+  }
+
+  if (!assignment) {
+    return (
+      <Container size="md" py="xl">
+        <Paper p="xl" shadow="sm" radius="md" withBorder>
+          <Text>Assignment not found</Text>
+          <Button
+            leftSection={<IconArrowLeft size={14} />}
+            onClick={() => router.push("/")}
+            mt="md"
+          >
+            Back to list
+          </Button>
+        </Paper>
+      </Container>
+    );
+  }
+
+  return (
+    <Container size="md" py="xl">
+      <Paper p="xl" shadow="sm" radius="md" withBorder>
+        <Group justify="space-between" mb="lg">
+          <Title order={3}>Route Server Assignment Details</Title>
+          <Group>
+            <Button
+              leftSection={<IconArrowLeft size={14} />}
+              variant="outline"
+              onClick={() => router.push("/")}
+              disabled={deleting}
+            >
+              Back
+            </Button>
+            <Button
+              leftSection={<IconPencil size={14} />}
+              onClick={handleEdit}
+              disabled={deleting}
+            >
+              Edit
+            </Button>
+            <Button
+              leftSection={<IconTrash size={14} />}
+              color="red"
+              onClick={handleDelete}
+              loading={deleting}
+              disabled={deleting}
+            >
+              Delete
+            </Button>
+          </Group>
+        </Group>
+
+        <Divider mb="md" />
+
+        <Stack gap="md">
+          <Group>
+            <Text fw={700} w={150}>
+              Source:
+            </Text>
+            <Badge
+              color={assignment.source === "rules_conf" ? "orange" : "blue"}
+            >
+              {assignment.source === "rules_conf"
+                ? "Config File"
+                : "UI Created"}
+            </Badge>
+          </Group>
+
+          <Group>
+            <Text fw={700} w={150}>
+              Route Kind:
+            </Text>
+            <Badge color="blue">{assignment.route_kind}</Badge>
+          </Group>
+
+          <Group>
+            <Text fw={700} w={150}>
+              Priority:
+            </Text>
+            <Text>{assignment.priority}</Text>
+          </Group>
+
+          <Group>
+            <Text fw={700} w={150}>
+              Request Path:
+            </Text>
+            <Text>{assignment.from}</Text>
+          </Group>
+
+          <Group>
+            <Text fw={700} w={150}>
+              Redirect To:
+            </Text>
+            <Text>{assignment.to}</Text>
+          </Group>
+
+          <Box>
+            <Text fw={700} mb="xs">
+              Assigned Servers:
+            </Text>
+            <List>
+              {assignment.servers.map(
+                (server: { id: string; displayName: string }) => (
+                  <List.Item key={server.id}>{server.displayName}</List.Item>
+                )
+              )}
+            </List>
+          </Box>
+        </Stack>
+      </Paper>
+    </Container>
+  );
+}
+
+// Main page component with Suspense
+export default function RouteServerDetailPage() {
+  return (
+    <Suspense
+      fallback={
+        <Container size="md" py="xl">
+          <Stack align="center" justify="center" h="60vh">
+            <Loader size="lg" />
+            <Text>Loading...</Text>
+          </Stack>
+        </Container>
+      }
+    >
+      <RouteServerDetail />
+    </Suspense>
+  );
+}
