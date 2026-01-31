@@ -50,3 +50,4 @@ export interface ServerHealth {
   error?: string;
   lastChecked: string;
 }
+

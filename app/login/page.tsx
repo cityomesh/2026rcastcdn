@@ -11,12 +11,13 @@ export default function LoginPage() {
   const router = useRouter();
   const hasRedirected = useRef(false);
 
-useEffect(() => {
-  if (!loading && isAuthenticated) {
-    console.log("User is authenticated, redirecting...");
-    router.replace("/"); // push kante replace production ki better
-  }
-}, [isAuthenticated, loading, router]);
+  useEffect(() => {
+    // Only redirect once and after loading is complete
+    if (!loading && isAuthenticated && !hasRedirected.current) {
+      hasRedirected.current = true;
+      router.push("/");
+    }
+  }, [isAuthenticated, loading, router]);
 
   if (loading) {
     return (

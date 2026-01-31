@@ -42,7 +42,7 @@ export async function GET(req: NextRequest) {
   try {
     const token = process.env.BACKEND_API_TOKEN;
     const res = await fetch(
-      `http://103.189.178.102:3001/api/servers/health?id=${id}`,
+      `http://103.189.178.126:3001/api/servers/health?id=${id}`,
       {
         headers: {
           Authorization: `Bearer ${token}`,

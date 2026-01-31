@@ -1,5 +1,3 @@
-"use client";
-
 import {
   Text,
   Stack,
@@ -21,12 +19,7 @@ import { UlkaTable } from "../UlkaTable/ulka-table";
 import { ClientOnly } from "../ClientOnly/client-only";
 import { api } from "@/app/utils/api";
 import { IconSearch, IconRefresh, IconFilter } from "@tabler/icons-react";
-import { StreamType, RouteServerAssignment } from "@/app/types/server"; // ✅ removed Server
-
-// ✅ Define safe window interface
-interface WindowWithSelectedServer extends Window {
-  SELECTED_SERVER?: string;
-}
+import { StreamType, RouteServerAssignment } from "@/app/types/server";
 
 export const NimbleHomeContent = () => {
   const [routeServers, setRouteServers] = useState<RouteServerAssignment[]>([]);
@@ -35,7 +28,6 @@ export const NimbleHomeContent = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [filterType, setFilterType] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [selectedServer, setSelectedServer] = useState<string>("All Servers");
 
   const fetchRouteServers = useCallback(async () => {
     setLoading(true);
@@ -58,20 +50,8 @@ export const NimbleHomeContent = () => {
     fetchRouteServers();
   }, [fetchRouteServers]);
 
-  // ✅ Type-safe global selected server
   useEffect(() => {
-    (window as WindowWithSelectedServer).SELECTED_SERVER = selectedServer;
-  }, [selectedServer]);
-
-
-  // ✅ Extract IP from displayName
-  const extractIp = (displayName: string) => {
-    const match = displayName.match(/\b\d{1,3}(?:\.\d{1,3}){3}\b/);
-    return match ? match[0].trim() : displayName.trim();
-  };
-
-  // ✅ Filter + search logic
-  useEffect(() => {
+    // Apply filters when searchTerm or filterType changes
     let filtered = [...routeServers];
 
     if (searchTerm) {
@@ -89,41 +69,18 @@ export const NimbleHomeContent = () => {
       filtered = filtered.filter((item) => item.route_kind === filterType);
     }
 
-    if (selectedServer && selectedServer !== "All Servers") {
-      filtered = filtered.filter((item) =>
-        item.servers.some(
-          (server) => extractIp(server.displayName) === selectedServer
-        )
-      );
-    }
-
     setFilteredData(filtered);
-  }, [searchTerm, filterType, selectedServer, routeServers]);
+  }, [searchTerm, filterType, routeServers]);
 
-  // ✅ Flatten data (1 row = 1 server)
-  const flattenedData = filteredData.flatMap((item) =>
-    item.servers.map((server) => ({
-      ...item,
-      singleServer: server,
-    }))
-  );
+  const handleRefresh = () => {
+    fetchRouteServers();
+  };
 
-  const handleRefresh = () => fetchRouteServers();
-
+  // Get count of each stream type
   const streamTypeCounts = routeServers.reduce((acc, item) => {
     acc[item.route_kind] = (acc[item.route_kind] || 0) + 1;
     return acc;
   }, {} as Record<string, number>);
-
-  // ✅ Unique servers for dropdown
-  const uniqueServers = Array.from(
-    new Set(routeServers.flatMap((item) => item.servers.map((s) => extractIp(s.displayName))))
-  ).filter((ip) => ip && ip !== "");
-
-  const serverOptions = [
-    { value: "All Servers", label: "All Servers" },
-    ...uniqueServers.map((ip) => ({ value: ip, label: ip })),
-  ];
 
   return (
     <Stack gap="lg">
@@ -141,15 +98,6 @@ export const NimbleHomeContent = () => {
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.currentTarget.value)}
           />
-
-          <Select
-            placeholder="Select Server"
-            data={serverOptions}
-            value={selectedServer}
-            onChange={(value) => setSelectedServer(value || "All Servers")}
-            style={{ flex: 1 }}
-          />
-
           <Group>
             <Select
               placeholder="Filter by stream type"
@@ -210,8 +158,14 @@ export const NimbleHomeContent = () => {
               </Text>
             </Stack>
           </Flex>
-        ) : flattenedData.length === 0 ? (
-          <Flex justify="center" align="center" direction="column" h={300} gap="md">
+        ) : filteredData.length === 0 ? (
+          <Flex
+            justify="center"
+            align="center"
+            direction="column"
+            h={300}
+            gap="md"
+          >
             <Text size="lg" fw={500} c="dimmed">
               No assignments found
             </Text>
@@ -227,10 +181,16 @@ export const NimbleHomeContent = () => {
           </Flex>
         ) : (
           <Box>
-            <Text size="sm" fw={500} c="dimmed" mb="xs" suppressHydrationWarning>
-              Showing {flattenedData.length} of {routeServers.length} assignments
+            <Text
+              size="sm"
+              fw={500}
+              c="dimmed"
+              mb="xs"
+              suppressHydrationWarning
+            >
+              Showing {filteredData.length} of {routeServers.length} assignments
             </Text>
-            <UlkaTable data={flattenedData} onDataChange={fetchRouteServers} />
+            <UlkaTable data={filteredData} onDataChange={fetchRouteServers} />
           </Box>
         )}
       </Paper>

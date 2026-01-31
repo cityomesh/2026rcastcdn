@@ -73,7 +73,7 @@ export const UserManagement = () => {
   const fetchUsers = async () => {
     try {
       setLoading(true);
-      const response = await api.get("api/auth/users");
+      const response = await api.get("/api/auth/users");
       if (response.success) {
         setUsers(response.data);
       }
